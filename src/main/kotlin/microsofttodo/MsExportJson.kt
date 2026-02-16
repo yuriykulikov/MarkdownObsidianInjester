@@ -2,9 +2,7 @@ package microsofttodo
 
 import kotlinx.serialization.Serializable
 
-/**
- * Classes which https://github.com/daylamtayari/Microsoft-To-Do-Export creates
- */
+/** Classes which https://github.com/daylamtayari/Microsoft-To-Do-Export creates */
 @Serializable
 data class TaskList(
     val id: String,
