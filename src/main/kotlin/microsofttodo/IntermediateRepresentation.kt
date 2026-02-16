@@ -1,10 +1,12 @@
+package microsofttodo
+
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import kotlinx.datetime.Instant as KxInstant
 
 /**
- * Obsidian Board
+ * Obsidian microsofttodo.Board
  */
 @Serializable
 data class Board(

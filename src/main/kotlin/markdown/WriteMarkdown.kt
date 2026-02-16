@@ -1,6 +1,11 @@
+package markdown
+
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import microsofttodo.Action
+import microsofttodo.Board
+import microsofttodo.Project
 import java.io.BufferedWriter
 import java.io.File
 
@@ -17,7 +22,7 @@ fun String.sanitize(): String {
 }
 
 /**
- * Writes [Board] tasks to a Kanban board Markdown.
+ * Writes [microsofttodo.Board] tasks to a Kanban board Markdown.
  * All tasks with subtasks or descriptions are written as files.
  * Oneliners are written as tasks directly in the board.
  */
