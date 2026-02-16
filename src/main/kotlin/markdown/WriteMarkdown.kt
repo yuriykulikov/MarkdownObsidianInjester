@@ -1,13 +1,13 @@
 package markdown
 
+import gtd.Action
+import gtd.Board
+import gtd.Project
 import java.io.BufferedWriter
 import java.io.File
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import gtd.Action
-import gtd.Board
-import gtd.Project
 
 fun Instant.short(): String {
   val localDateTime = this.toLocalDateTime(TimeZone.UTC)
@@ -21,13 +21,14 @@ fun String.sanitize(): String {
 }
 
 /**
- * Writes [Board] tasks to a Kanban board Markdown. All tasks with subtasks or
- * descriptions are written as files. Oneliners are written as tasks directly in the board.
+ * Writes [Board] tasks to a Kanban board Markdown. All tasks with subtasks or descriptions are
+ * written as files. Oneliners are written as tasks directly in the board.
  */
 fun writeMarkdown(board: Board, outputDir: File) {
   val boardDir = File(outputDir, board.title.sanitize())
+  boardDir.deleteRecursively()
   boardDir.mkdirs()
-  val boardFile = File(boardDir, "${board.title.sanitize()}.md")
+  val boardFile = File(boardDir, "${board.title.sanitize()} Kanban.md")
 
   val (doneTasks, todoTasks) = board.projects.partition { it.isCompleted }
 
@@ -36,19 +37,24 @@ fun writeMarkdown(board: Board, outputDir: File) {
     writer.appendLine("kanban-plugin: board")
     writer.appendLine("---")
 
-    writer.appendLine("## TODO")
-    todoTasks.forEach { task -> writer.appendTaskLine(task) }
+    todoTasks
+        .groupBy { it.stage }
+        .forEach { (stage, tasks) ->
+          writer.appendLine("## ${stage?:"ASAP"}")
+          tasks.forEach { task -> writer.appendTaskLine(task) }
+        }
 
     writer.appendLine("## Done")
     doneTasks.sortedBy { it.completed }.forEach { task -> writer.appendTaskLine(task) }
 
+    writer.appendLine("")
     writer.appendLine(
         """
-            %% kanban:settings
-            ```
-            {"kanban-plugin":"board","list-collapse":[null,false]}
-            ```
-            %%
+%% kanban:settings
+```
+{"kanban-plugin":"board","list-collapse":[null,false],"move-dates":true,"metadata-keys":[{"metadataKey":"created","label":"","shouldHideLabel":false,"containsMarkdown":false},{"metadataKey":"due","label":"","shouldHideLabel":false,"containsMarkdown":false}]}
+```
+%%
         """
             .trimIndent())
   }
@@ -63,6 +69,21 @@ private fun writeProjectFile(task: Project, boardDir: File) {
   val taskFile = File(dir, taskFileName)
 
   taskFile.bufferedWriter().use { taskWriter ->
+    if (task.created != null ||
+        task.due != null ||
+        task.completed != null ||
+        task.updated != null ||
+        task.tags.isNotEmpty() ||
+        task.origin != null) {
+      taskWriter.appendLine("---")
+      task.created?.let { taskWriter.appendLine("created: ${it.short()}") }
+      task.updated?.let { taskWriter.appendLine("modified: ${it.short()}") }
+      task.due?.let { taskWriter.appendLine("due: ${it.short()}") }
+      task.completed?.let { taskWriter.appendLine("completed: ${it.short()}") }
+      task.origin?.let { taskWriter.appendLine("origin: $it") }
+      taskWriter.appendLine("---")
+    }
+
     if (task.actions.isNotEmpty() || (task.due != null && !task.isCompleted)) {
 
       taskWriter.appendLine("## Actions")
@@ -81,24 +102,11 @@ private fun writeProjectFile(task: Project, boardDir: File) {
 
     taskWriter.appendLine()
 
-    if (task.created != null || task.due != null || task.completed != null || task.stage != null || task.updated != null || task.tags.isNotEmpty() || task.origin != null || task.parent != null) {
-      taskWriter.appendLine("---")
-      // TODO if completed tag or move to archive?
-      task.created?.let { taskWriter.appendLine("Created: ${it.short()}") }
-      task.updated?.let { taskWriter.appendLine("Updated: ${it.short()}") }
-      task.due?.let { taskWriter.appendLine("Due: ${it.short()}") }
-      task.completed?.let { taskWriter.appendLine("Completed At: ${it.short()}") }
-      task.stage?.let { taskWriter.appendLine("Stage: $it") }
-      task.parent?.let { taskWriter.appendLine("Parent: $it") }
-      task.origin?.let { taskWriter.appendLine("Origin: $it") }
-      taskWriter.appendLine()
-    }
-    task.tags.forEach { tag ->
-      taskWriter.appendLine("#$tag")
-    }
+    task.tags.forEach { tag -> taskWriter.appendLine("#${tag.lowercase()}") }
     if (task.isCompleted) {
       taskWriter.appendLine("#archive")
     }
+    taskWriter.appendLine("#project")
   }
 }
 

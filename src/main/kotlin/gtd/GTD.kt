@@ -23,7 +23,6 @@ data class Project(
     val stage: String? = null,
     val tags: List<String> = emptyList(),
     val origin: String? = null,
-    val parent: String? = null,
 ) {
   val hasBody = description != null || actions.isNotEmpty()
 }
@@ -35,5 +34,3 @@ data class Action(
     val completed: Boolean,
     val due: KxInstant? = null,
 )
-
-
