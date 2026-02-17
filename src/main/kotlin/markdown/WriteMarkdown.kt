@@ -5,9 +5,9 @@ import java.io.File
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import microsofttodo.Action
-import microsofttodo.Board
-import microsofttodo.Project
+import gtd.Action
+import gtd.Board
+import gtd.Project
 
 fun Instant.short(): String {
   val localDateTime = this.toLocalDateTime(TimeZone.UTC)
@@ -21,7 +21,7 @@ fun String.sanitize(): String {
 }
 
 /**
- * Writes [microsofttodo.Board] tasks to a Kanban board Markdown. All tasks with subtasks or
+ * Writes [Board] tasks to a Kanban board Markdown. All tasks with subtasks or
  * descriptions are written as files. Oneliners are written as tasks directly in the board.
  */
 fun writeMarkdown(board: Board, outputDir: File) {
@@ -29,7 +29,7 @@ fun writeMarkdown(board: Board, outputDir: File) {
   boardDir.mkdirs()
   val boardFile = File(boardDir, "${board.title.sanitize()}.md")
 
-  val (doneTasks, todoTasks) = board.tasks.partition { it.completed }
+  val (doneTasks, todoTasks) = board.projects.partition { it.isCompleted }
 
   boardFile.bufferedWriter().use { writer ->
     writer.appendLine("---")
@@ -40,7 +40,7 @@ fun writeMarkdown(board: Board, outputDir: File) {
     todoTasks.forEach { task -> writer.appendTaskLine(task) }
 
     writer.appendLine("## Done")
-    doneTasks.sortedBy { it.completedTime }.forEach { task -> writer.appendTaskLine(task) }
+    doneTasks.sortedBy { it.completed }.forEach { task -> writer.appendTaskLine(task) }
 
     writer.appendLine(
         """
@@ -53,21 +53,21 @@ fun writeMarkdown(board: Board, outputDir: File) {
             .trimIndent())
   }
 
-  board.tasks.filter { it.hasBody }.forEach { task -> writeProjectFile(task, boardDir) }
+  board.projects.filter { it.hasBody }.forEach { task -> writeProjectFile(task, boardDir) }
 }
 
 private fun writeProjectFile(task: Project, boardDir: File) {
   val taskFileName = "${task.title.sanitize()}.md"
-  val dir = if (task.completed) boardDir.resolve("Archive") else boardDir
+  val dir = if (task.isCompleted) boardDir.resolve("Archive") else boardDir
   dir.mkdirs()
   val taskFile = File(dir, taskFileName)
 
   taskFile.bufferedWriter().use { taskWriter ->
-    if (task.actions.isNotEmpty() || (task.due != null && !task.completed)) {
+    if (task.actions.isNotEmpty() || (task.due != null && !task.isCompleted)) {
 
       taskWriter.appendLine("## Actions")
       taskWriter.appendLine()
-      if (!task.completed) {
+      if (!task.isCompleted) {
         task.due?.let { taskWriter.appendLine("- [ ] Finish until \uD83D\uDCC5 ${it.short()}") }
       }
       task.actions.sortedBy { it.completed }.forEach { action -> taskWriter.appendAction(action) }
@@ -81,24 +81,32 @@ private fun writeProjectFile(task: Project, boardDir: File) {
 
     taskWriter.appendLine()
 
-    if (task.created != null || task.due != null || task.completedTime != null) {
+    if (task.created != null || task.due != null || task.completed != null || task.stage != null || task.updated != null || task.tags.isNotEmpty() || task.origin != null || task.parent != null) {
       taskWriter.appendLine("---")
       // TODO if completed tag or move to archive?
-      task.created?.let { taskWriter.appendLine("Created: ${task.created.short()}") }
+      task.created?.let { taskWriter.appendLine("Created: ${it.short()}") }
+      task.updated?.let { taskWriter.appendLine("Updated: ${it.short()}") }
       task.due?.let { taskWriter.appendLine("Due: ${it.short()}") }
-      task.completedTime?.let { taskWriter.appendLine("Completed At: ${it.short()}\n") }
+      task.completed?.let { taskWriter.appendLine("Completed At: ${it.short()}") }
+      task.stage?.let { taskWriter.appendLine("Stage: $it") }
+      task.parent?.let { taskWriter.appendLine("Parent: $it") }
+      task.origin?.let { taskWriter.appendLine("Origin: $it") }
+      taskWriter.appendLine()
     }
-    if (task.completed) {
+    task.tags.forEach { tag ->
+      taskWriter.appendLine("#$tag")
+    }
+    if (task.isCompleted) {
       taskWriter.appendLine("#archive")
     }
   }
 }
 
 private fun BufferedWriter.appendTaskLine(task: Project) {
-  val flag = if (task.completed) "x" else " "
+  val flag = if (task.isCompleted) "x" else " "
   val createdTimeStr = task.created?.let { " ➕ ${task.created.short()}" }.orEmpty()
   val dueStr = task.due?.let { " \uD83D\uDCC5 " + it.short() }.orEmpty()
-  val completedString = task.completedTime?.let { " ✅ " + it.short() }.orEmpty()
+  val completedString = task.completed?.let { " ✅ " + it.short() }.orEmpty()
   if (task.hasBody) {
     // created and due will be in the project note
     appendLine("- [$flag] [[${task.title.sanitize()}]]$completedString")

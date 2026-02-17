@@ -1,10 +1,9 @@
-package microsofttodo.microsofttodo
+package microsofttodo
 
 import java.io.File
 import markdown.sanitize
 import markdown.short
 import markdown.writeMarkdown
-import microsofttodo.transform
 import org.junit.jupiter.api.Test
 
 class MsToMdTest {
@@ -15,12 +14,12 @@ class MsToMdTest {
     val boards =
         transform(json = File("in/mstodo_export.json")).map { board ->
           board.copy(
-              tasks =
-                  board.tasks.map { task ->
+              projects =
+                  board.projects.map { task ->
                     task.copy(created = task.created?.takeIf { it.short() != "2019-12-24" })
                   })
         }
-    val nonEmptyBoards = boards.filter { it.tasks.isNotEmpty() }
+    val nonEmptyBoards = boards.filter { it.projects.isNotEmpty() }
     nonEmptyBoards.forEach { board -> writeMarkdown(board, outputDir) }
     outputDir.resolve("index.md").bufferedWriter().use { writer ->
       nonEmptyBoards.forEach { board -> writer.appendLine(" - [[${board.title.sanitize()}]]") }
